@@ -412,13 +412,18 @@ Both directions share one shape:
 
 | Direction | `type` | Purpose |
 |---|---|---|
-| Daemon → server | `hello` | Sent immediately after connect. |
+| Daemon → server | `hello` | Sent immediately after connect, only when the upgrade response has no `X-Moshi-Features` header (older servers). `features` lists the daemon's capabilities. |
+| Server → daemon | `hello.ack` | `features`: the announced capabilities the server supports. |
+| Server → daemon | `usage.pull` | Asks for current usage (`requestId`). Sent only when `usage.pull` was acked. |
+| Daemon → server | `usage.snapshot` | Reply to `usage.pull`: same `requestId`, `snapshots`. |
 | Daemon → server | `pending-action.open` | A blocking approval is waiting (forwarded hook request, TUI bridge prompt or script `ask`). `actionId`, title/message, `expiresAt`; `options` for a multiple-choice ask. |
 | Daemon → server | `pending-action.closed` | The approval resolved or expired on the host; the server drops it. |
 | Server → daemon | `action.approve` / `action.deny` | The user's decision: `actionId` + `decision` + `requestedAt`; `choice` (option id) on a multiple-choice approve. |
 | Daemon → server | `ack` | The decision reached its pending approval. |
 | Daemon → server | `ping` | Keepalive, byte-exact `{"type":"ping"}`. |
 | Server → daemon | `pong` | Answered at the Cloudflare edge (`setWebSocketAutoResponse`) without waking the Durable Object. |
+
+The daemon announces its capabilities on the upgrade request as `X-Moshi-Features: usage.pull` (comma-separated). The server answers with the same header on the 101 response, listing those it supports (empty for none), and the daemon then sends no `hello`. On Cloudflare the first message on a new socket can keep the Durable Object billed as active for minutes, so a connection that has nothing else to say should send nothing.
 
 Unknown types are logged and ignored — receivers must be lenient so the server can ship new frames ahead of daemon upgrades.
 
@@ -470,6 +475,13 @@ suppress_nested_agent_push = false
 # read, the push is sent.
 #   moshi-hook set suppress-push-while-unlocked on
 suppress_push_while_unlocked = false
+# Silence visible pushes for agents running outside tmux/zellij/herdr or a
+# mux driver: the phone has no pane to open for them, so the notification can
+# only be dismissed. Events still publish silently so the inbox stays current.
+# Approvals the phone can answer and `moshi-hook notify`/`ask` stay audible.
+# On by default.
+#   moshi-hook set suppress-push-without-mux off
+suppress_push_without_mux = true
 # Periodically `git fetch` the upstream branch of repos shown in workspace
 # summaries and diff sessions, so "behind" counts include commits pushed
 # elsewhere. Off by default: fetching uses your git credentials, and an SSH
