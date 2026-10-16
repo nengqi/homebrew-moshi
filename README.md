@@ -52,6 +52,22 @@ brew services restart moshi-hook
 
 Homebrew owns the installed binary, so use `brew upgrade moshi-hook` instead of `moshi update`.
 
+## Running behind a proxy
+
+`moshi-hook` reads `HTTPS_PROXY` / `HTTP_PROXY` from its environment; there is no `moshi set` key for a proxy. To route the service through one on macOS, add the variables to the service plist and reload it:
+
+```bash
+PLIST=~/Library/LaunchAgents/sh.brew.moshi-hook.plist
+/usr/libexec/PlistBuddy \
+  -c 'Add :EnvironmentVariables dict' \
+  -c 'Add :EnvironmentVariables:HTTPS_PROXY string http://127.0.0.1:7890' \
+  -c 'Add :EnvironmentVariables:HTTP_PROXY string http://127.0.0.1:7890' \
+  "$PLIST"
+launchctl unload "$PLIST" && launchctl load -w "$PLIST"
+```
+
+`brew services start` / `restart` and `brew upgrade` regenerate this plist from the formula and drop the variables without warning, so re-apply them afterwards (or reload with `launchctl` instead of `brew services restart`).
+
 ## Uninstall
 
 ```bash
